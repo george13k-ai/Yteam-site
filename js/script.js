@@ -15,24 +15,42 @@ mainNav.querySelectorAll('a').forEach(link => {
 });
 
 // Liquid glass — pointer-tracked highlight on glass surfaces
-const glassEls = document.querySelectorAll('.glass');
-glassEls.forEach(el => {
-  el.addEventListener('pointermove', (e) => {
-    const rect = el.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    el.style.setProperty('--mx', x + '%');
-    el.style.setProperty('--my', y + '%');
+// Skipped on touch devices: no real hover there, and it saves battery/perf.
+const supportsFineHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+if (supportsFineHover) {
+  const glassEls = document.querySelectorAll('.glass');
+  let pendingEl = null, pendingX = 0, pendingY = 0, ticking = false;
+
+  const applyHighlight = () => {
+    pendingEl.style.setProperty('--mx', pendingX + '%');
+    pendingEl.style.setProperty('--my', pendingY + '%');
+    ticking = false;
+  };
+
+  glassEls.forEach(el => {
+    el.addEventListener('pointermove', (e) => {
+      const rect = el.getBoundingClientRect();
+      pendingEl = el;
+      pendingX = ((e.clientX - rect.left) / rect.width) * 100;
+      pendingY = ((e.clientY - rect.top) / rect.height) * 100;
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(applyHighlight);
+      }
+    });
   });
-});
+}
 
 // Scroll reveal animations
 const revealEls = document.querySelectorAll('.reveal');
 const revealObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
-      entry.target.classList.add('is-visible');
-      revealObserver.unobserve(entry.target);
+      const el = entry.target;
+      el.style.willChange = 'transform, opacity';
+      el.classList.add('is-visible');
+      el.addEventListener('transitionend', () => { el.style.willChange = 'auto'; }, { once: true });
+      revealObserver.unobserve(el);
     }
   });
 }, { threshold: 0.15 });
